@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Aberrações Visuais Unificado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos e resets base */
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            touch-action: pan-y; /* Previne scroll horizontal em mobile */
+        }
+
+        /* Área de visualização geral */
+        .view-area {
+            perspective: 1000px;
+        }
+
+        /* Lâmpadas genéricas */
+        .lamp-base {
+            transition: width 0.1s linear, height 0.1s linear, box-shadow 0.1s linear;
+            z-index: 10;
+        }
+
+        /* Base para os Raios (Genérico) */
+        .ray-base {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: 0% 50%;
+            z-index: 5;
+            mix-blend-mode: screen;
+        }
+
+        /* Cenário 1: Starburst Afunilado */
+        .ray-sb {
+            border-radius: 0 50px 50px 0;
+            transition: width 0.1s linear, height 0.1s linear;
+            clip-path: polygon(0 0, 100% 16.67%, 100% 83.33%, 0 100%);
+        }
+
+        /* Cenário 3: Glare Picotado (Sem clip-path que afunila, usa border-radius) */
+        .ray-gl {
+            border-radius: 0 50px 50px 0;
+        }
+
+        /* Cenário 2: O Container do Texto (Visão Dupla) */
+        #text-container-dv {
+            transition: font-size 0.1s linear;
+        }
+
+        /* Customização dos Sliders */
+        input[type=range] {
+            accent-color: #3b82f6;
+        }
+        
+        /* Suavizando as transições do Olho CSS */
+        .eye-pupil {
+            transition: width 0.3s ease-out, height 0.3s ease-out;
+        }
+
+        /* Controle Z-Index do Menu */
+        #menu-container {
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col relative">
+
+    <!-- MENU HAMBÚRGUER -->
+    <div id="menu-container" class="absolute top-4 left-4">
+        <button id="menu-btn" class="p-2 bg-zinc-800 text-white rounded-md shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-zinc-700 hover:bg-zinc-700 transition">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+        </button>
+        <div id="menu-dropdown" class="hidden absolute top-full left-0 mt-2 w-56 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl flex flex-col overflow-hidden">
+            <button class="menu-item text-left px-4 py-3 text-zinc-200 font-medium hover:bg-zinc-700 w-full" data-target="app-starburst">Starburst</button>
+            <button class="menu-item text-left px-4 py-3 text-zinc-200 font-medium border-t border-zinc-700 hover:bg-zinc-700 w-full" data-target="app-double-vision">Visão dupla</button>
+            <button class="menu-item text-left px-4 py-3 text-zinc-200 font-medium border-t border-zinc-700 hover:bg-zinc-700 w-full" data-target="app-glare">Glare/'Starburst'</button>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- CENÁRIO 1: STARBURST                       -->
+    <!-- ========================================== -->
+    <div id="app-starburst" class="app-scenario flex flex-col h-full w-full">
+        <main class="view-area flex-1 relative overflow-hidden bg-zinc-950 shadow-inner">
+            <div id="lamp-sb" class="lamp-base absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full"></div>
+            <div id="rays-container-sb" class="absolute inset-0 pointer-events-none"></div>
+        </main>
+        <aside class="w-full bg-zinc-900 border-t border-zinc-800 p-5 md:p-8 flex flex-col gap-8 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-30 shrink-0 rounded-t-3xl md:rounded-none">
+            <div class="flex flex-col gap-3 max-w-2xl mx-auto w-full">
+                <div class="flex justify-between items-center text-sm md:text-base font-medium text-zinc-300">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7zM9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1z"/></svg>
+                        <label for="distance-sb">Distância da Lâmpada</label>
+                    </div>
+                    <span id="dist-val-sb" class="text-white font-bold bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg w-20 text-center shadow-inner">0.5 m</span>
+                </div>
+                <input type="range" id="distance-sb" min="1" max="20" step="1" value="1" class="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer shadow-inner">
+                <div class="flex justify-between text-xs text-zinc-500 font-medium"><span>0.5m (Perto)</span><span>10m (Longe)</span></div>
+            </div>
+            <div class="flex flex-col gap-3 max-w-2xl mx-auto w-full">
+                <div class="flex justify-between items-center text-sm md:text-base font-medium text-zinc-300">
+                    <label for="pupil-sb">Tamanho da Pupila</label>
+                    <span id="pupil-val-sb" class="text-white font-bold bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg w-24 text-center shadow-inner">3.0 mm</span>
+                </div>
+                <div class="flex items-center gap-5">
+                    <div class="flex-1">
+                        <input type="range" id="pupil-sb" min="1" max="11" step="1" value="1" class="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer shadow-inner">
+                        <div class="flex justify-between text-xs text-zinc-500 font-medium mt-2"><span>3.0mm</span><span>8.0mm</span></div>
+                    </div>
+                    <div class="w-16 h-12 md:w-20 md:h-14 flex items-center justify-center shrink-0 bg-white rounded-[50%] shadow-[0_0_15px_rgba(0,0,0,0.5)_inset] overflow-hidden border-2 border-zinc-500 relative">
+                        <div class="w-12 h-12 md:w-14 md:h-14 bg-indigo-900 rounded-full flex items-center justify-center absolute shadow-[0_0_10px_rgba(0,0,0,0.8)_inset]">
+                            <div id="eye-pupil-sb" class="eye-pupil bg-black rounded-full" style="width: 12px; height: 12px;"></div>
+                            <div class="absolute top-2 left-3 w-2 h-2 bg-white rounded-full opacity-70"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- CENÁRIO 2: VISÃO DUPLA                     -->
+    <!-- ========================================== -->
+    <div id="app-double-vision" class="app-scenario flex flex-col h-full w-full hidden">
+        <main class="view-area flex-1 relative overflow-hidden bg-zinc-950 shadow-inner flex items-center justify-center">
+            <div id="text-container-dv" class="relative text-center w-11/12 max-w-4xl font-semibold leading-relaxed">
+                <div id="clone-text-dv" class="absolute top-0 left-0 w-full h-full text-transparent opacity-30 blur-[0.8px] z-10 pointer-events-none select-none">
+                    Câmera Fusion principal de 48 MP com abertura variável. Fotos e vídeos melhores em pouca luz e profundidade de campo impressionante.
+                </div>
+                <div id="main-text-dv" class="relative text-white z-20">
+                    Câmera Fusion principal de 48 MP com abertura variável. Fotos e vídeos melhores em pouca luz e profundidade de campo impressionante.
+                </div>
+            </div>
+        </main>
+        <aside class="w-full bg-zinc-900 border-t border-zinc-800 p-5 md:p-8 flex flex-col gap-8 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-30 shrink-0 rounded-t-3xl md:rounded-none">
+            <div class="flex flex-col gap-3 max-w-2xl mx-auto w-full">
+                <div class="flex justify-between items-center text-sm md:text-base font-medium text-zinc-300">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.5L7 17H9.5L10.5 13.5H15.5L16.5 17H19L14 2.5H12ZM11.25 10.75L13 4.5L14.75 10.75H11.25Z"/></svg>
+                        <label for="distance-dv">Distância do texto</label>
+                    </div>
+                    <span id="dist-val-dv" class="text-white font-bold bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg w-20 text-center shadow-inner">0.5 m</span>
+                </div>
+                <input type="range" id="distance-dv" min="1" max="20" step="1" value="1" class="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer shadow-inner">
+                <div class="flex justify-between text-xs text-zinc-500 font-medium"><span>0.5m (Perto)</span><span>10m (Longe)</span></div>
+            </div>
+            <div class="flex flex-col gap-3 max-w-2xl mx-auto w-full">
+                <div class="flex justify-between items-center text-sm md:text-base font-medium text-zinc-300">
+                    <label for="pupil-dv">Tamanho da Pupila</label>
+                    <span id="pupil-val-dv" class="text-white font-bold bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg w-24 text-center shadow-inner">3.0 mm</span>
+                </div>
+                <div class="flex items-center gap-5">
+                    <div class="flex-1">
+                        <input type="range" id="pupil-dv" min="1" max="11" step="1" value="1" class="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer shadow-inner">
+                        <div class="flex justify-between text-xs text-zinc-500 font-medium mt-2"><span>3.0mm</span><span>8.0mm</span></div>
+                    </div>
+                    <div class="w-16 h-12 md:w-20 md:h-14 flex items-center justify-center shrink-0 bg-white rounded-[50%] shadow-[0_0_15px_rgba(0,0,0,0.5)_inset] overflow-hidden border-2 border-zinc-500 relative">
+                        <div class="w-12 h-12 md:w-14 md:h-14 bg-indigo-900 rounded-full flex items-center justify-center absolute shadow-[0_0_10px_rgba(0,0,0,0.8)_inset]">
+                            <div id="eye-pupil-dv" class="eye-pupil bg-black rounded-full" style="width: 12px; height: 12px;"></div>
+                            <div class="absolute top-2 left-3 w-2 h-2 bg-white rounded-full opacity-70"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- CENÁRIO 3: GLARE / STARBURST               -->
+    <!-- ========================================== -->
+    <div id="app-glare" class="app-scenario flex flex-col h-full w-full hidden">
+        <main class="view-area flex-1 relative overflow-hidden bg-zinc-950 shadow-inner">
+            <div id="lamp-gl" class="lamp-base absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full"></div>
+            <div id="rays-container-gl" class="absolute inset-0 pointer-events-none"></div>
+        </main>
+        <aside class="w-full bg-zinc-900 border-t border-zinc-800 p-5 md:p-8 flex flex-col gap-8 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-30 shrink-0 rounded-t-3xl md:rounded-none">
+            <div class="flex flex-col gap-3 max-w-2xl mx-auto w-full">
+                <div class="flex justify-between items-center text-sm md:text-base font-medium text-zinc-300">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7zM9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9v1z"/></svg>
+                        <label for="distance-gl">Distância da Lâmpada</label>
+                    </div>
+                    <span id="dist-val-gl" class="text-white font-bold bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg w-20 text-center shadow-inner">0.5 m</span>
+                </div>
+                <input type="range" id="distance-gl" min="1" max="20" step="1" value="1" class="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer shadow-inner">
+                <div class="flex justify-between text-xs text-zinc-500 font-medium"><span>0.5m (Perto)</span><span>10m (Longe)</span></div>
+            </div>
+            <div class="flex flex-col gap-3 max-w-2xl mx-auto w-full">
+                <div class="flex justify-between items-center text-sm md:text-base font-medium text-zinc-300">
+                    <label for="pupil-gl">Tamanho da Pupila</label>
+                    <span id="pupil-val-gl" class="text-white font-bold bg-zinc-800 border border-zinc-700 px-3 py-1.5 rounded-lg w-24 text-center shadow-inner">3.0 mm</span>
+                </div>
+                <div class="flex items-center gap-5">
+                    <div class="flex-1">
+                        <input type="range" id="pupil-gl" min="1" max="11" step="1" value="1" class="w-full h-3 bg-zinc-700 rounded-lg appearance-none cursor-pointer shadow-inner">
+                        <div class="flex justify-between text-xs text-zinc-500 font-medium mt-2"><span>3.0mm</span><span>8.0mm</span></div>
+                    </div>
+                    <div class="w-16 h-12 md:w-20 md:h-14 flex items-center justify-center shrink-0 bg-white rounded-[50%] shadow-[0_0_15px_rgba(0,0,0,0.5)_inset] overflow-hidden border-2 border-zinc-500 relative">
+                        <div class="w-12 h-12 md:w-14 md:h-14 bg-indigo-900 rounded-full flex items-center justify-center absolute shadow-[0_0_10px_rgba(0,0,0,0.8)_inset]">
+                            <div id="eye-pupil-gl" class="eye-pupil bg-black rounded-full" style="width: 12px; height: 12px;"></div>
+                            <div class="absolute top-2 left-3 w-2 h-2 bg-white rounded-full opacity-70"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- SCRIPTS                                    -->
+    <!-- ========================================== -->
+    <script>
+        // ------------------------------------
+        // Menu Hambúrguer - Lógica de Troca
+        // ------------------------------------
+        const menuBtn = document.getElementById('menu-btn');
+        const menuDropdown = document.getElementById('menu-dropdown');
+        const menuItems = document.querySelectorAll('.menu-item');
+        const apps = document.querySelectorAll('.app-scenario');
+
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menuDropdown.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
+                menuDropdown.classList.add('hidden');
+            }
+        });
+
+        menuItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                const targetId = e.target.getAttribute('data-target');
+                apps.forEach(app => app.classList.add('hidden')); 
+                document.getElementById(targetId).classList.remove('hidden'); 
+                menuDropdown.classList.add('hidden'); 
+            });
+        });
+
+
+        // ------------------------------------
+        // Lógica: Cenário 1 - STARBURST
+        // ------------------------------------
+        const sliderDistance_sb = document.getElementById('distance-sb');
+        const sliderPupil_sb = document.getElementById('pupil-sb');
+        const valDistance_sb = document.getElementById('dist-val-sb');
+        const valPupil_sb = document.getElementById('pupil-val-sb');
+        const lamp_sb = document.getElementById('lamp-sb');
+        const raysContainer_sb = document.getElementById('rays-container-sb');
+        const eyePupil_sb = document.getElementById('eye-pupil-sb');
+
+        const TOTAL_RAYS_SB = 15;
+        const raysData_sb = []; 
+
+        function initStarburst_sb() {
+            const angleStep = 360 / TOTAL_RAYS_SB;
+            for (let i = 0; i < TOTAL_RAYS_SB; i++) {
+                const rayEl = document.createElement('div');
+                rayEl.classList.add('ray-base', 'ray-sb');
+                
+                const baseLength = 80 + Math.random() * 300; 
+                const baseThickness = 1 + Math.random() * 3; 
+                const baseOpacity = 0.2 + Math.random() * 0.5;
+                const angle = (i * angleStep) + ((Math.random() * 10) - 5);
+
+                raysContainer_sb.appendChild(rayEl);
+                raysData_sb.push({ el: rayEl, baseLength, baseThickness, baseOpacity, angle });
+            }
+        }
+
+        function updateVisuals_sb() {
+            const stepPupil = parseInt(sliderPupil_sb.value);
+            const stepDist = parseInt(sliderDistance_sb.value);
+
+            const pupilMm = 3.0 + ((stepPupil - 1) * 0.5);
+            const distMeters = stepDist * 0.5;
+            
+            valDistance_sb.textContent = `${distMeters.toFixed(1)} m`;
+            valPupil_sb.textContent = `${pupilMm.toFixed(1)} mm`;
+
+            const adjusted_pupil_factor = (pupilMm - 3) / 5;
+            const distFactor = (distMeters - 0.5) / 9.5; 
+            const close_factor = 1 - distFactor;
+
+            const visualPupilSize = 12 + (adjusted_pupil_factor * 20);
+            eyePupil_sb.style.width = `${visualPupilSize}px`;
+            eyePupil_sb.style.height = `${visualPupilSize}px`;
+
+            const lampSize = 12 + (close_factor * 68);
+            lamp_sb.style.width = `${lampSize}px`;
+            lamp_sb.style.height = `${lampSize}px`;
+            lamp_sb.style.boxShadow = `0 0 ${20 + (adjusted_pupil_factor * 30)}px ${5 + (adjusted_pupil_factor * 10)}px rgba(255, 255, 255, ${0.4 + (close_factor * 0.6)})`;
+
+            raysData_sb.forEach(ray => {
+                const length = ray.baseLength * adjusted_pupil_factor * (0.3 + distFactor * 0.7);
+                const originalThickness = ray.baseThickness + (close_factor * 2.5);
+                const thickBase = originalThickness * 1.5; 
+                
+                const opacityRaw = ray.baseOpacity + (close_factor * 0.4);
+                const calculatedOpacity = Math.min(1, opacityRaw);
+
+                ray.el.style.width = `${length}px`;
+                ray.el.style.height = `${thickBase}px`;
+                ray.el.style.marginTop = `-${thickBase / 2}px`;
+                ray.el.style.opacity = 1; 
+
+                ray.el.style.background = `linear-gradient(to right, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, ${calculatedOpacity}) 25%, rgba(255, 255, 255, 0) 100%)`;
+                ray.el.style.transform = `rotate(${ray.angle}deg)`;
+                ray.el.style.display = length < 2 ? 'none' : 'block';
+            });
+        }
+
+
+        // ------------------------------------
+        // Lógica: Cenário 2 - VISÃO DUPLA
+        // ------------------------------------
+        const sliderDistance_dv = document.getElementById('distance-dv');
+        const sliderPupil_dv = document.getElementById('pupil-dv');
+        const valDistance_dv = document.getElementById('dist-val-dv');
+        const valPupil_dv = document.getElementById('pupil-val-dv');
+        const textContainer_dv = document.getElementById('text-container-dv');
+        const cloneText_dv = document.getElementById('clone-text-dv');
+        const eyePupil_dv = document.getElementById('eye-pupil-dv');
+
+        function updateVisuals_dv() {
+            const stepPupil = parseInt(sliderPupil_dv.value);
+            const stepDist = parseInt(sliderDistance_dv.value);
+
+            const pupilMm = 3.0 + ((stepPupil - 1) * 0.5);
+            const distMeters = stepDist * 0.5;
+            
+            valDistance_dv.textContent = `${distMeters.toFixed(1)} m`;
+            valPupil_dv.textContent = `${pupilMm.toFixed(1)} mm`;
+
+            const adjusted_pupil_factor = (pupilMm - 3) / 5;
+            const distFactor = (distMeters - 0.5) / 9.5; 
+            const close_factor = 1 - distFactor;
+
+            const visualPupilSize = 12 + (adjusted_pupil_factor * 20);
+            eyePupil_dv.style.width = `${visualPupilSize}px`;
+            eyePupil_dv.style.height = `${visualPupilSize}px`;
+
+            const fontSize = 14 + (close_factor * 34);
+            textContainer_dv.style.fontSize = `${fontSize}px`;
+
+            const maxOffsetPx = (distFactor * 2) + (adjusted_pupil_factor * 8) + (distFactor * adjusted_pupil_factor * 25);
+
+            if (maxOffsetPx === 0) {
+                cloneText_dv.style.textShadow = 'none';
+            } else {
+                let shadows = [];
+                const steps = 40; 
+                for (let i = 1; i <= steps; i++) {
+                    let offset = (maxOffsetPx / steps) * i;
+                    shadows.push(`${offset}px ${offset}px 0 #ffffff`);
+                }
+                cloneText_dv.style.textShadow = shadows.join(', ');
+            }
+        }
+
+
+        // ------------------------------------
+        // Lógica: Cenário 3 - GLARE / STARBURST
+        // ------------------------------------
+        const sliderDistance_gl = document.getElementById('distance-gl');
+        const sliderPupil_gl = document.getElementById('pupil-gl');
+        const valDistance_gl = document.getElementById('dist-val-gl');
+        const valPupil_gl = document.getElementById('pupil-val-gl');
+        const lamp_gl = document.getElementById('lamp-gl');
+        const raysContainer_gl = document.getElementById('rays-container-gl');
+        const eyePupil_gl = document.getElementById('eye-pupil-gl');
+
+        const TOTAL_RAYS_GL = 400; 
+        const raysData_gl = []; 
+
+        function initStarburst_gl() {
+            const angleStep = 360 / TOTAL_RAYS_GL;
+            for (let i = 0; i < TOTAL_RAYS_GL; i++) {
+                const rayEl = document.createElement('div');
+                rayEl.classList.add('ray-base', 'ray-gl');
+                
+                const length = 230 + (Math.random() * 20); 
+                const thickness = 0.4 + (Math.random() * 0.6); 
+                const opacity = 0.75 + (Math.random() * 0.1); 
+                const angle = (i * angleStep) + (Math.random() * 1.5 - 0.75);
+
+                let r = 255, g = 255, b = 255;
+                if (Math.random() > 0.9) {
+                    r = 150 + Math.random() * 105;
+                    g = 150 + Math.random() * 105;
+                    b = 150 + Math.random() * 105;
+                }
+
+                rayEl.style.width = `${length}px`;
+                rayEl.style.height = `${thickness}px`;
+                rayEl.style.marginTop = `-${thickness / 2}px`;
+                rayEl.style.opacity = opacity;
+                rayEl.style.transform = `rotate(${angle}deg)`;
+                rayEl.style.background = `linear-gradient(to right, rgba(${r},${g},${b},1), rgba(${r},${g},${b},0))`;
+                
+                raysContainer_gl.appendChild(rayEl);
+                raysData_gl.push({ 
+                    el: rayEl, 
+                    length: length, 
+                    r: r, 
+                    g: g, 
+                    b: b,
+                    phase: Math.random() * 200, 
+                    segmentVar: 0.3 + (Math.random() * 1.5) 
+                });
+            }
+        }
+
+        function updateVisuals_gl() {
+            const stepPupil = parseInt(sliderPupil_gl.value);
+            const stepDist = parseInt(sliderDistance_gl.value);
+
+            const pupilMm = 3.0 + ((stepPupil - 1) * 0.5);
+            const distMeters = stepDist * 0.5;
+            
+            valDistance_gl.textContent = `${distMeters.toFixed(1)} m`;
+            valPupil_gl.textContent = `${pupilMm.toFixed(1)} mm`;
+
+            const adjusted_pupil_factor = (pupilMm - 3) / 5;
+            const distFactor = (distMeters - 0.5) / 9.5; 
+            const close_factor = 1 - distFactor;
+
+            const visualPupilSize = 12 + (adjusted_pupil_factor * 20);
+            eyePupil_gl.style.width = `${visualPupilSize}px`;
+            eyePupil_gl.style.height = `${visualPupilSize}px`;
+
+            const lampSize = 12 + (close_factor * 68);
+            lamp_gl.style.width = `${lampSize}px`;
+            lamp_gl.style.height = `${lampSize}px`;
+            lamp_gl.style.boxShadow = `0 0 50px 15px rgba(255, 255, 255, ${0.4 + (close_factor * 0.6)})`;
+
+            let gapFactor = 0;
+            if (distMeters > 1.0) {
+                gapFactor = (distMeters - 1.0) / 9.0;
+            }
+
+            raysData_gl.forEach(ray => {
+                if (gapFactor === 0) {
+                    ray.el.style.background = `linear-gradient(to right, rgba(${ray.r},${ray.g},${ray.b},1), rgba(${ray.r},${ray.g},${ray.b},0))`;
+                    ray.el.style.backgroundPosition = '0px 0px';
+                    ray.el.style.webkitMaskImage = 'none';
+                    ray.el.style.maskImage = 'none';
+                } else {
+                    const segmentLength = (ray.length / 10) * ray.segmentVar;
+                    const gapSize = segmentLength * (gapFactor * 0.85); 
+                    const solidSize = segmentLength - gapSize;
+                    
+                    ray.el.style.background = `
+                        repeating-linear-gradient(
+                            to right,
+                            rgba(${ray.r},${ray.g},${ray.b}, 1) 0px,
+                            rgba(${ray.r},${ray.g},${ray.b}, 1) ${solidSize}px,
+                            transparent ${solidSize}px,
+                            transparent ${segmentLength}px
+                        )
+                    `;
+                    ray.el.style.backgroundPosition = `${ray.phase}px 0px`;
+                    ray.el.style.webkitMaskImage = `linear-gradient(to right, black 0%, transparent 100%)`;
+                    ray.el.style.maskImage = `linear-gradient(to right, black 0%, transparent 100%)`;
+                }
+            });
+        }
+
+        // ------------------------------------
+        // Inicializações e Listeners
+        // ------------------------------------
+        sliderDistance_sb.addEventListener('input', updateVisuals_sb);
+        sliderPupil_sb.addEventListener('input', updateVisuals_sb);
+
+        sliderDistance_dv.addEventListener('input', updateVisuals_dv);
+        sliderPupil_dv.addEventListener('input', updateVisuals_dv);
+
+        sliderDistance_gl.addEventListener('input', updateVisuals_gl);
+        sliderPupil_gl.addEventListener('input', updateVisuals_gl);
+
+        // Disparo Inicial (Gera tudo de uma vez para transições suaves)
+        window.addEventListener('DOMContentLoaded', () => {
+            initStarburst_sb();
+            updateVisuals_sb();
+            
+            updateVisuals_dv();
+            
+            initStarburst_gl();
+            updateVisuals_gl();
+        });
+
+    </script>
+</body>
+</html>
